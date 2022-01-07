@@ -16,3 +16,6 @@ Homeassistant intergration for Israel beaches weather monitoring.
 
 
 Data collected from [ims.data.gov.il](https://ims.data.gov.il/).
+
+
+## You are very welcome to add configuration flow
