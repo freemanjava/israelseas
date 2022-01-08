@@ -20,7 +20,7 @@ Creates sensor per beach:
 - sensor.israelseas_sea_of_galilee
 - sensor.israelseas_southern_coast
 
-When sensor get correct update it changes status to "Ok", all the data is in sensor attributes:
+The state of the sensor represents "Sea temperature", other data is in sensor attributes:
 
 ```
 LocationNameEng: Sea of Galilee
