@@ -20,7 +20,8 @@ import homeassistant.helpers.config_validation as cv
 from .const import (
     DOMAIN,
     LOCATIONS_MAP,
-    UVINDEX_MAP
+    UVINDEX_MAP,
+    ICONWAVES_MAP
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,12 +43,11 @@ class DataLoader():
         self._lastUpdate = datetime.now()
         self._radResource = 'https://ims.data.gov.il/sites/default/files/isr_rad.xml'
         self._tempResource = 'https://ims.data.gov.il/sites/default/files/isr_sea.xml'
-
+        _LOGGER.debug("LOCATIONS_MAP: {0}".format(LOCATIONS_MAP))
 
 
     def getUVIndexes(self):
-        _LOGGER.debug("-->getUVIndexes")
-        _LOGGER.debug("Updating from %s", self._radResource)        
+        _LOGGER.debug("-->getUVIndexes   Updating from %s", self._radResource)   
         try:
             response = self._http_session.request(
                 'GET',
@@ -59,6 +59,7 @@ class DataLoader():
                 verify=self._verify_ssl,
             )
             """response.encoding = 'utf-8'"""
+            _LOGGER.debug("Response code: %s %s", response.status_code, response.reason)
             self.data = response.text
             self.headers = response.headers
         except requests.exceptions.RequestException as ex:
@@ -71,7 +72,7 @@ class DataLoader():
         """locationsList = jsonpath(json_dict, '$...Location[?(@.LocationMetaData.LocationId==500|518|402|115|201)]')"""
         locationsList = jsonpath(json_dict, '$...Location[*]')
         locationsData = {};
-        
+
         current_datetime = datetime.now()      
         
         for location in locationsList:
@@ -92,7 +93,7 @@ class DataLoader():
                         currentTimeIndex = i
                         break
                    
-                """_LOGGER.warning("periodIndex: %s", currentTimeIndex)"""
+                _LOGGER.warning("periodIndex: %s", currentTimeIndex)
                 
                 if currentTimeIndex == -1:
                    locationData['UVIndex'] = '0'
@@ -110,8 +111,7 @@ class DataLoader():
 
 
     def getTemperatures(self):
-        _LOGGER.debug("-->getTemperatures")
-        _LOGGER.debug("Updating from %s", self._tempResource)
+        _LOGGER.debug("-->getTemperatures   Updating from %s", self._tempResource)
         try:
             response = self._http_session.request(
                 'GET',
@@ -122,6 +122,7 @@ class DataLoader():
                 timeout=self._timeout,
                 verify=self._verify_ssl,
             )
+            _LOGGER.debug("Response code: %s %s", response.status_code, response.reason)
             self.data = response.text
             self.headers = response.headers
         except requests.exceptions.RequestException as ex:
@@ -142,7 +143,7 @@ class DataLoader():
                 elementValue = element.get('ElementValue')
                 if elementName == 'Sea status and waves height' :
                     elementValues = elementValue.split('/')
-                    locationData['Sea status'] = elementValues[0].strip()
+                    locationData['Sea condition'] = elementValues[0].strip()
                     locationData['Waves height'] = elementValues[1].strip()
                     waves = locationData['Waves height'].split('-')
                     locationData['Waves min'] = waves[0].strip()
@@ -161,20 +162,20 @@ class DataLoader():
     def update(self):
         """Fetch new state data for the sensor"""
         if (self._lastUpdate < datetime.now() - timedelta(seconds = 10)) :
+            _LOGGER.debug("DataLoader.update")
             self._lastUpdate = datetime.now()
             attrs = {}            
             locationsData = self.getTemperatures()
             uvlocationsData = self.getUVIndexes()
-            _LOGGER.debug("uvlocationsData: {0}".format(uvlocationsData))
-            _LOGGER.debug("LOCATIONS_MAP: {0}".format(LOCATIONS_MAP))
+            """_LOGGER.debug("uvlocationsData: {0}".format(uvlocationsData))"""
             for element in uvlocationsData:
                 if uvlocationsData[element].get("UVLocationId") in LOCATIONS_MAP.keys():
                     translatedName = LOCATIONS_MAP.get(uvlocationsData[element].get("UVLocationId"))
                     if translatedName in locationsData.keys():
-                        _LOGGER.debug("tempData: {0}".format(locationsData.get(translatedName)))
-                        _LOGGER.debug("uvData: {0}".format(uvlocationsData[element]))
+                        """_LOGGER.debug("tempData: {0}".format(locationsData.get(translatedName)))"""
+                        """_LOGGER.debug("uvData: {0}".format(uvlocationsData[element]))"""
                         locationsData.get(translatedName).update(uvlocationsData[element])
-                        _LOGGER.debug("resultData: {0}".format(locationsData[translatedName]))                        
+                        """_LOGGER.debug("resultData: {0}".format(locationsData[translatedName]))"""
             attrs = locationsData
             self._attributes = attrs
             self._state = 'Ok'
@@ -188,7 +189,7 @@ DEFAULT_NAME = 'IsraelSeas'
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Required(DOMAIN, default=DEFAULT_NAME): cv.string,
     vol.Required(CONF_BEACHES, default=[]):
-        vol.All(cv.ensure_list, [vol.In(ISRAELBEACHES)])
+        vol.All(cv.ensure_list, [vol.In(ISRAELBEACHES)])      
 })
 
 
@@ -196,7 +197,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     name = config.get(DOMAIN)
     dev = []
     for beach in config[CONF_BEACHES]:
-        _LOGGER.debug('{} setup:{}'.format(DOMAIN,beach))
+        _LOGGER.debug('{} setup: {}'.format(DOMAIN,beach))
         uid = '{}_{}'.format("israelseas", beach)
         entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, uid, hass=hass)
         dev.append(IsraelSeasSensor(entity_id, beach))
@@ -232,11 +233,15 @@ class IsraelSeasSensor(Entity):
     def update(self):
         _DATALOADER.update()
         if (_DATALOADER._attributes is not None):
-	        self._state = _DATALOADER._state
-	        self._attributes = _DATALOADER._attributes[self._name]
-	        return _DATALOADER.update()
-           
-		   
+            self._state = _DATALOADER._attributes[self._name]["Sea temperature"]
+            self._attributes = _DATALOADER._attributes[self._name]
+            for waveSize in ICONWAVES_MAP.keys():
+                if (int(self._state) < waveSize):
+                    self._attributes['icon'] = ICONWAVES_MAP[waveSize]
+                    break
+        return self._state;
+
+
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
