@@ -89,11 +89,12 @@ class DataLoader():
                    elementPeriodStartDt = datetime.strptime(elementPeriodStart, '%Y-%m-%d %H:%M')
                    elementPeriodEnd = location.get('LocationData').get('TimeUnitData')[i].get('SolRadPeriod').get('DateTimeTo')
                    elementPeriodEndDt = datetime.strptime(elementPeriodEnd, '%Y-%m-%d %H:%M')
-                   if (current_datetime>elementPeriodStartDt and current_datetime<elementPeriodEndDt):
+                   _LOGGER.debug("periodIndex: %s  current_datetime: %s    elementPeriodStartDt: %s elementPeriodEndDt: %s", i, current_datetime,elementPeriodStartDt, elementPeriodEndDt)
+                   if (current_datetime > elementPeriodStartDt and current_datetime < elementPeriodEndDt):
                         currentTimeIndex = i
                         break
                    
-                _LOGGER.warning("periodIndex: %s", currentTimeIndex)
+                _LOGGER.warning("currentTimeIndex: %s", currentTimeIndex)
                 
                 if currentTimeIndex == -1:
                    locationData['UVIndex'] = '0'
