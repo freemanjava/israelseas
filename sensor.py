@@ -8,6 +8,9 @@ from jsonpath import jsonpath
 from requests import Session
 import voluptuous as vol
 from requests.auth import HTTPBasicAuth, HTTPDigestAuth
+
+from const import CONF_RAD_RESOURCE, CONF_TEMP_RESOURCE
+
 """Platform for sensor integration."""
 from homeassistant.const import TEMP_CELSIUS
 from homeassistant.helpers.entity import Entity
@@ -30,7 +33,7 @@ CONF_BEACHES = 'beaches'
 
 class DataLoader():
 
-    def __init__(self):
+    def __init__(self, rad_resource, temp_resource):
         """Initialize the sensor."""
         self._state = None
         self._attributes = None
@@ -41,8 +44,8 @@ class DataLoader():
         self._timeout = 10000
         self._verify_ssl = True
         self._lastUpdate = datetime.now()
-        self._radResource = 'https://ims.data.gov.il/sites/default/files/isr_rad.xml'
-        self._tempResource = 'https://ims.data.gov.il/sites/default/files/isr_sea.xml'
+        self._radResource = rad_resource
+        self._tempResource = temp_resource
         _LOGGER.debug("LOCATIONS_MAP: {0}".format(LOCATIONS_MAP))
 
 
@@ -183,7 +186,7 @@ class DataLoader():
 
 
 
-_DATALOADER = DataLoader()
+# _DATALOADER = DataLoader()
 ISRAELBEACHES = ['Northern Coast', 'Southern Coast', 'Sea of Galilee','Gulf of Elat']
 DEFAULT_NAME = 'IsraelSeas'
 
@@ -194,26 +197,43 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 })
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
-    name = config.get(DOMAIN)
+# def setup_platform(hass, config, add_entities, discovery_info=None):
+#     name = config.get(DOMAIN)
+#     dev = []
+#     for beach in config[CONF_BEACHES]:
+#         _LOGGER.debug('{} setup: {}'.format(DOMAIN,beach))
+#         uid = '{}_{}'.format("israelseas", beach)
+#         entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, uid, hass=hass)
+#         dev.append(IsraelSeasSensor(entity_id, beach))
+#     add_entities(dev, True)
+
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    rad_resource = config_entry.options.get(CONF_RAD_RESOURCE, config_entry.data.get(CONF_RAD_RESOURCE))
+    temp_resource = config_entry.options.get(CONF_TEMP_RESOURCE, config_entry.data.get(CONF_TEMP_RESOURCE))
+    beaches = config_entry.data.get(CONF_BEACHES, [])
+
+    data_loader = DataLoader(rad_resource, temp_resource)
+
     dev = []
-    for beach in config[CONF_BEACHES]:
-        _LOGGER.debug('{} setup: {}'.format(DOMAIN,beach))
-        uid = '{}_{}'.format("israelseas", beach)
+    for beach in beaches:
+        uid = f"israelseas_{beach}"
         entity_id = async_generate_entity_id(ENTITY_ID_FORMAT, uid, hass=hass)
-        dev.append(IsraelSeasSensor(entity_id, beach))
-    add_entities(dev, True)
+        dev.append(IsraelSeasSensor(entity_id, beach, data_loader))
+
+    async_add_entities(dev, True)
+
 
 
 
 class IsraelSeasSensor(Entity):
 
-    def __init__(self, entity_id, name):
+    def __init__(self, entity_id, name, data_loader):
         """Initialize the sensor."""
         self.entity_id = entity_id
         self._state = None
         self._attributes = {}
         self._name = name
+        self._data_loader = data_loader
 
     @property
     def name(self):
@@ -232,10 +252,10 @@ class IsraelSeasSensor(Entity):
 
 
     def update(self):
-        _DATALOADER.update()
-        if (_DATALOADER._attributes is not None):
-            self._state = _DATALOADER._attributes[self._name]["Sea temperature"]
-            self._attributes = _DATALOADER._attributes[self._name]
+        self._data_loader.update()
+        if (self._data_loader._attributes is not None):
+            self._state = self._data_loader._attributes[self._name]["Sea temperature"]
+            self._attributes = self._data_loader._attributes[self._name]
             for waveSize in ICONWAVES_MAP.keys():
                 if (int(self._state) < waveSize):
                     self._attributes['icon'] = ICONWAVES_MAP[waveSize]
