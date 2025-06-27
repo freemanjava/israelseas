@@ -6,7 +6,7 @@ from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_RAD_RESOURCE, CONF_TEMP_RESOURCE
 
 
 @callback
@@ -27,6 +27,12 @@ class IsrSeasFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Init IsrSeasFlowHandler."""
         self._errors = {}
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        return IsraelSeasOptionsFlowHandler(config_entry)
+
 
     async def async_step_user(self, user_input=None):
         """Handle a flow initialized by the user."""
@@ -54,7 +60,9 @@ class IsrSeasFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_NAME, default=name): str
+                    vol.Required(CONF_NAME, default=name): str,
+                    vol.Required(CONF_RAD_RESOURCE, default="https://ims.data.gov.il/sites/default/files/isr_rad.xml"): str,
+                    vol.Required(CONF_TEMP_RESOURCE, default="https://ims.data.gov.il/sites/default/files/isr_sea.xml"): str
                 }
             ),
             errors=self._errors,
@@ -65,3 +73,32 @@ class IsrSeasFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(
             title=HOME_LOCATION_NAME, data={CONF_TRACK_HOME: True}
         )
+
+class IsraelSeasOptionsFlowHandler(config_entries.OptionsFlow):
+    def __init__(self, config_entry):
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Required(
+                    CONF_RAD_RESOURCE,
+                    default=self.config_entry.options.get(
+                        CONF_RAD_RESOURCE,
+                        self.config_entry.data.get(CONF_RAD_RESOURCE, "https://ims.data.gov.il/sites/default/files/isr_rad.xml")
+                    ),
+                ): str,
+                vol.Required(
+                    CONF_TEMP_RESOURCE,
+                    default=self.config_entry.options.get(
+                        CONF_TEMP_RESOURCE,
+                        self.config_entry.data.get(CONF_TEMP_RESOURCE, "https://ims.data.gov.il/sites/default/files/isr_sea.xml")
+                    ),
+                ): str,
+            }),
+        )
+

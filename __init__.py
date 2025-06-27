@@ -13,7 +13,8 @@ async def async_setup(hass: HomeAssistant, config: Config) -> bool:
 async def async_setup_entry(hass, config_entry):
     """Set up IsraelSeas as config entry."""
     hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(config_entry, "israelseas")
+        hass.config_entries.async_forward_entry_setup(config_entry, "israelseas"),
+        hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
     )
     return True
 

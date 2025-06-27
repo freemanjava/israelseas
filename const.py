@@ -3,6 +3,10 @@ import logging
 
 from homeassistant.components.weather import DOMAIN as WEATHER_DOMAIN
 
+CONF_RAD_RESOURCE = "rad_resource"
+
+CONF_TEMP_RESOURCE = "temp_resource"
+
 DOMAIN = "israelseas"
 
 _LOGGER = logging.getLogger(".")
